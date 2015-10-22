@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2013, 2014 Red Hat, Inc. 
+ * Copyright (c) 2013, 2015 Red Hat, Inc. 
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -28,28 +28,31 @@ import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.thym.core.plugin.registry.CordovaRegistryPlugin;
-import org.eclipse.thym.core.plugin.registry.CordovaRegistryPluginVersion;
+import org.eclipse.thym.core.plugin.registry.CordovaRegistryPlugin.RegistryPluginVersion;
 
-public class CordovaPluginItem extends BaseCordovaPluginItem<CordovaRegistryPlugin> {
+public class CordovaPluginItem extends ControlListItem<CordovaRegistryPlugin> {
 	
 	private final static int MAX_DESCRIPTION_LENGTH = 162;
 	
+	private final CordovaPluginViewer viewer;
+	private final CordovaPluginWizardResources resources;
 	private Label description;
 	private Label nameLabel;
 	private Label licenseLbl;
-	private final CordovaPluginViewer viewer;
-	private CordovaRegistryPluginVersion currentSelectedVersion;
+	private RegistryPluginVersion currentSelectedVersion;
 	private ComboViewer versionComboViewer;
 
 	public CordovaPluginItem(Composite parent, int style, CordovaRegistryPlugin element, CordovaPluginWizardResources resources, CordovaPluginViewer viewer ) {
-		super(parent, element, resources);
+		super(parent, SWT.NULL, element);
 		this.viewer = viewer;
-		createContent();
+		this.resources = resources;
 	}
 
 	@Override
 	protected void refresh() {
-	//Nothing to do
+		if(nameLabel == null){
+			createContent();
+		}
 	}
 
 	private void createContent(){
@@ -58,8 +61,7 @@ public class CordovaPluginItem extends BaseCordovaPluginItem<CordovaRegistryPlug
 		layout.marginTop = 2;
 		layout.marginBottom = 2;
 		setLayout(layout);
-
-		Composite versionContainer = new Composite(this, SWT.INHERIT_NONE);
+		Composite versionContainer = new Composite(this, SWT.NULL);
 		GridDataFactory.swtDefaults().align(SWT.CENTER, SWT.BEGINNING).span(1, 2).applyTo(versionContainer);
 		GridLayoutFactory.fillDefaults().spacing(1, 1).numColumns(2).applyTo(versionContainer);
 		
@@ -75,14 +77,14 @@ public class CordovaPluginItem extends BaseCordovaPluginItem<CordovaRegistryPlug
 			}
 			@Override
 			public Object[] getElements(Object inputElement) {
-				List<CordovaRegistryPluginVersion> versions = getData().getVersions();
+				List<RegistryPluginVersion> versions = getData().getVersions();
 				return versions.toArray();
 			}
 		});
 		versionComboViewer.setLabelProvider(new LabelProvider(){
 			@Override
 			public String getText(Object element) {
-				CordovaRegistryPluginVersion ver = (CordovaRegistryPluginVersion)element;
+				RegistryPluginVersion ver = (RegistryPluginVersion)element;
 				return ver.getVersionNumber();
 			}
 		});
@@ -91,7 +93,7 @@ public class CordovaPluginItem extends BaseCordovaPluginItem<CordovaRegistryPlug
 			@Override
 			public void selectionChanged(SelectionChangedEvent event) {
 				IStructuredSelection selection = (IStructuredSelection)event.getSelection();
-				CordovaRegistryPluginVersion selectedVersion = (CordovaRegistryPluginVersion) selection.getFirstElement();
+				RegistryPluginVersion selectedVersion = (RegistryPluginVersion) selection.getFirstElement();
 				modifyVersionSelection(selectedVersion);
 				
 			}
@@ -116,10 +118,19 @@ public class CordovaPluginItem extends BaseCordovaPluginItem<CordovaRegistryPlug
 		licenseLbl = new Label(detailsContainer, SWT.NONE);
 		licenseLbl.setFont(resources.getSubTextFont());
 		GridDataFactory.fillDefaults().grab(true, false).applyTo(licenseLbl);
-		updateValues();
+		setDescriptionText(getData().getDescription());
+		licenseLbl.setText("License:"+getData().getLicense());
+		
+		Label separator = new Label(this, SWT.SEPARATOR | SWT.HORIZONTAL);
+		GridDataFactory.fillDefaults()
+		.indent(0, 2)
+		.grab(true, false)
+		.span(3, 1)
+		.align(SWT.FILL, SWT.BEGINNING)
+		.applyTo(separator);
 	}
 
-	private void modifyVersionSelection(CordovaRegistryPluginVersion selectedVersion) {
+	private void modifyVersionSelection(RegistryPluginVersion selectedVersion) {
 		if(selectedVersion == null ){
 			selectedVersion = getLatestCordovaRegistryPluginVersion();
 		}
@@ -130,24 +141,10 @@ public class CordovaPluginItem extends BaseCordovaPluginItem<CordovaRegistryPlug
 		this.viewer.modifySelection(currentSelectedVersion, false);//now add the new one
 	}
 	
-	private CordovaRegistryPluginVersion getLatestCordovaRegistryPluginVersion(){
-		String latest = getData().getLatestVersion();
-		List<CordovaRegistryPluginVersion> versions = getData().getVersions();
-		for ( CordovaRegistryPluginVersion cordovaPluginVersion : versions) {
-			if(cordovaPluginVersion.getVersionNumber().equals(latest)){
-				return cordovaPluginVersion;
-			}
-		}
-		return null;
-	}
-
-	private void updateValues() {
-		IStructuredSelection sel = (IStructuredSelection) versionComboViewer.getSelection();
-		if(sel.isEmpty())
-			return;
-		CordovaRegistryPluginVersion ver = (CordovaRegistryPluginVersion) sel.getFirstElement();
-		setDescriptionText(ver.getDescription());
-		licenseLbl.setText("License:"+ver.getLicense());
+	private RegistryPluginVersion getLatestCordovaRegistryPluginVersion(){
+		CordovaRegistryPlugin plugin = getData();
+		String latest = plugin.getLatestVersion();
+		return plugin.getVersion(latest);
 	}
 
 	private void setDescriptionText(String descriptionText) {

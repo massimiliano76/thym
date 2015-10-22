@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2013, 2014 Red Hat, Inc. 
+ * Copyright (c) 2013, 2015 Red Hat, Inc. 
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,18 +10,29 @@
  *******************************************************************************/
 package org.eclipse.thym.core.engine;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Platform;
-import org.eclipse.core.runtime.Status;
 import org.eclipse.thym.core.HybridCore;
 import org.eclipse.thym.core.HybridProject;
+import org.eclipse.thym.core.config.Engine;
+import org.eclipse.thym.core.config.Widget;
+import org.eclipse.thym.core.config.WidgetModel;
 import org.eclipse.thym.core.engine.internal.cordova.CordovaEngineProvider;
-import org.eclipse.thym.core.internal.util.ConfigJSon;
 import org.eclipse.thym.core.platform.PlatformConstants;
-
+import org.osgi.framework.Version;
+/**
+ * API for managing the engines for a {@link HybridProject}.
+ * 
+ * @author Gorkem Ercan
+ *
+ */
 public class HybridMobileEngineManager {
 	
 	private final HybridProject project;
@@ -30,65 +41,131 @@ public class HybridMobileEngineManager {
 		this.project = project;
 	}
 
-	public HybridMobileEngine getActiveEngine(){
+	/**
+	 * Returns the effective engines for project. 
+	 * Active engines are determined as follows. 
+	 * <ol>
+	 * 	<li>
+	 * if <i>engine</i> entries exist on config.xml match them to installed cordova engines. 
+	 * 	</li>
+	 * 	<li>
+	 * if no <i>engine</i> entries exists on config.xml returns the default engines.
+	 * if default engines can be determined.
+	 * 	</li>
+	 * @see HybridMobileEngineManager#defaultEngines()
+	 * @return possibly empty array of {@link HybridMobileEngine}s
+	 */
+	public HybridMobileEngine[] getActiveEngines(){
 		try{
-			ConfigJSon configJson = ConfigJSon.readConfigJson(project.getProject());
-			if(configJson == null || configJson.getEngineId() == null ){
-				HybridCore.log(IStatus.WARNING, "No engine information on the config.json, this is OK if using an old project. Falling back to default engine.",null );
-				return defaultEngine();
+			WidgetModel model = WidgetModel.getModel(project);
+			Widget w = model.getWidgetForRead();
+			List<Engine> engines = null; 
+			if(w != null ){
+				engines = w.getEngines();
 			}
-			if(CordovaEngineProvider.CORDOVA_ENGINE_ID.equals(configJson.getEngineId()) || 
-					CordovaEngineProvider.CUSTOM_CORDOVA_ENGINE_ID.equals(configJson.getEngineId())){
-				CordovaEngineProvider engineProvider = new CordovaEngineProvider();
-				HybridMobileEngine engine = engineProvider.getEngine(configJson.getEngineId(),configJson.getEngineVersion());
-				return engine;
+			if(engines == null || engines.isEmpty() ){
+				HybridCore.log(IStatus.INFO, "No engine information exists on config.xml. Falling back to default engines",null );
+				return defaultEngines();
 			}
-			
+			CordovaEngineProvider engineProvider = new CordovaEngineProvider();
+			ArrayList<HybridMobileEngine> activeEngines = new ArrayList<HybridMobileEngine>();
+			final List<HybridMobileEngine> availableEngines = engineProvider.getAvailableEngines();
+			for (Engine engine : engines) {
+				for (HybridMobileEngine hybridMobileEngine : availableEngines) {
+					if(engineMatches(engine, hybridMobileEngine)){
+						activeEngines.add(hybridMobileEngine);
+						break;
+					}
+				}
+			}
+			return activeEngines.toArray(new HybridMobileEngine[activeEngines.size()]);
 		} catch (CoreException e) {
-			HybridCore.log(IStatus.WARNING, "No existing engines can be created", e);
+			HybridCore.log(IStatus.WARNING, "Engine information can not be read", e);
 		}
-		HybridCore.log(IStatus.WARNING, "Could not determine the engine used, falling back to default engine", null);
-		return defaultEngine();
+		HybridCore.log(IStatus.WARNING, "Could not determine the engines used", null);
+		return new HybridMobileEngine[0];
 	}
 
-	private HybridMobileEngine defaultEngine() {
-		HybridMobileEngine engine = getDefaultEngine();
-		if(engine == null ){
-			CordovaEngineProvider engineProvider = new CordovaEngineProvider();
-			engine =  engineProvider.createEngine(CordovaEngineProvider.CORDOVA_ENGINE_ID,"3.1.0");
+	private boolean engineMatches(Engine configEngine, HybridMobileEngine engine){
+		//null checks needed: sometimes we encounter engines without a name or version attribute.
+		if(engine.isManaged()){
+			return configEngine.getName() != null && configEngine.getName().equals(engine.getId()) &&
+				configEngine.getVersion() != null && configEngine.getVersion().equals(engine.getVersion());
+		}else{
+			return engine.getLocation().isValidPath(configEngine.getVersion()) 
+					&& engine.getLocation().equals(new Path(configEngine.getVersion()));
 		}
-		return engine;
+	}
+	
+	public static HybridMobileEngine[] defaultEngines() {
+		CordovaEngineProvider engineProvider = new CordovaEngineProvider();
+		List<HybridMobileEngine> availableEngines = engineProvider.getAvailableEngines();
+		if(availableEngines == null || availableEngines.isEmpty() ){
+			return new HybridMobileEngine[0];
+		}
+		ArrayList<HybridMobileEngine> defaults = new ArrayList<HybridMobileEngine>();
+		
+		String pref =  Platform.getPreferencesService().getString(PlatformConstants.HYBRID_UI_PLUGIN_ID, PlatformConstants.PREF_DEFAULT_ENGINE, null, null);
+		if(pref != null && !pref.isEmpty()){
+			String[] engineStrings = pref.split(",");
+			for (String engineString : engineStrings) {
+				String[] engineInfo = engineString.split(":");
+				for (HybridMobileEngine hybridMobileEngine : availableEngines) {
+					if(engineInfo[0].equals(hybridMobileEngine.getId()) && engineInfo[1].equals(hybridMobileEngine.getVersion())){
+						defaults.add(hybridMobileEngine);
+					}
+				}
+			}
+		}else{
+			HashMap<String, HybridMobileEngine> platforms = new HashMap<String, HybridMobileEngine>();
+			for (HybridMobileEngine hybridMobileEngine : availableEngines) {
+				if(platforms.containsKey(hybridMobileEngine.getId())){
+					HybridMobileEngine existing = platforms.get(hybridMobileEngine.getId());
+					try{
+						Version ev = Version.parseVersion(existing.getVersion());
+						Version hv = Version.parseVersion(hybridMobileEngine.getVersion());
+						if(hv.compareTo(ev) >0 ){
+							platforms.put(hybridMobileEngine.getId(), hybridMobileEngine);
+						}
+					}catch(IllegalArgumentException e){
+						//catch the version parse errors because version field may actually contain 
+						//git urls and local paths.
+					}
+				}else{
+					platforms.put(hybridMobileEngine.getId(),hybridMobileEngine);
+				}
+			}
+			defaults.addAll(platforms.values());
+		}
+		return defaults.toArray(new HybridMobileEngine[defaults.size()]);
 	}
 
 	/**
-	 * Returns the default engine defined by preferences or null if it is not 
-	 * defined or does not exist anymore.
+	 * Persists the engine information. 
 	 * 
-	 * @return engine
+	 * @param engine
+	 * @throws CoreException
 	 */
-	public static HybridMobileEngine getDefaultEngine() {
-		CordovaEngineProvider engineProvider = new CordovaEngineProvider();
-		String pref =  Platform.getPreferencesService().getString(PlatformConstants.HYBRID_UI_PLUGIN_ID, PlatformConstants.PREF_DEFAULT_ENGINE, null, null);
-		if(pref != null && !pref.isEmpty()){
-			String[] valuePair = pref.split(":");
-			List<HybridMobileEngine> engines = engineProvider.getAvailableEngines();
-			for (HybridMobileEngine engine : engines) {
-				if(engine.getId().equals(valuePair[0]) && engine.getVersion().equals(valuePair[1])){
-					return engine;
-				}
+	public void updateEngines(HybridMobileEngine[] engines) throws CoreException{
+		WidgetModel model = WidgetModel.getModel(project);
+		Widget w = model.getWidgetForEdit();
+		List<Engine> existingEngines = w.getEngines();
+		if(existingEngines != null ){
+			for (Engine existingEngine : existingEngines) {
+				w.removeEngine(existingEngine);
 			}
 		}
-		return null;
-	}
-	
-
-	public void updateEngine(HybridMobileEngine engine) throws CoreException{
-		ConfigJSon configJSon = ConfigJSon.readConfigJson(project.getProject());
-		if(configJSon == null) {
-			throw new CoreException(new Status(IStatus.ERROR, HybridCore.PLUGIN_ID, "config.json does not exist or can not be parsed. Updating the hybrid mobile engine for the project " + project.getProject().getName() +" failed."));
+		for (HybridMobileEngine engine : engines) {
+			Engine e = model.createEngine(w);
+			e.setName(engine.getId());
+			if(!engine.isManaged()){
+				e.setVersion(engine.getLocation().toString());
+			}else{
+				e.setVersion(engine.getVersion());
+			}
+			w.addEngine(e);
 		}
-		configJSon.setEngineInfo(engine);
-		configJSon.persist(project.getProject());
+		model.save();
 	}
 
 }

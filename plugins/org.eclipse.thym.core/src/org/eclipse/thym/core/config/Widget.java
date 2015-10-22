@@ -11,7 +11,6 @@
 package org.eclipse.thym.core.config;
 
 import static org.eclipse.thym.core.config.WidgetModelConstants.NAME_ATTR_SHORT;
-import static org.eclipse.thym.core.config.WidgetModelConstants.NS_PHONEGAP_1_0;
 import static org.eclipse.thym.core.config.WidgetModelConstants.NS_W3C_WIDGET;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_ATTR_ID;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_ATTR_VERSION;
@@ -26,6 +25,7 @@ import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_LICEN
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_NAME;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_PREFERENCE;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_SPLASH;
+import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_ENGINE;
 
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
@@ -64,6 +64,7 @@ public class Widget extends AbstractConfigObject {
 	private Property<List<Feature>> features = new Property<List<Feature>>("features");
 	private Property<List<Icon>> icons = new Property<List<Icon>>("icons");
 	private Property<List<Splash>> splashes = new Property<List<Splash>>("splashes");
+	private Property<List<Engine>> engines = new Property<List<Engine>>("engines");
 	
 	/**
 	 * Creates a new instance from its xml representation.
@@ -95,10 +96,11 @@ public class Widget extends AbstractConfigObject {
 		loadItem(WIDGET_TAG_CONTENT, null, node, content, Content.class);
 		loadItem(WIDGET_TAG_LICENSE,null,node,license,License.class );
 		loadListItem(WIDGET_TAG_PREFERENCE,null,node, preferences, Preference.class);
-		loadListItem(WIDGET_TAG_ACCESS,null, node, accesses, Access.class);
+		loadListItem(WIDGET_TAG_ACCESS, null, node, accesses, Access.class);
 		loadListItem(WIDGET_TAG_FEATURE, null,node,features, Feature.class);
 		loadListItem(WIDGET_TAG_ICON, null, node, icons, Icon.class);
-		loadListItem(WIDGET_TAG_SPLASH,NS_PHONEGAP_1_0, node, splashes, Splash.class);
+		loadListItem(WIDGET_TAG_SPLASH, null, node, splashes, Splash.class);
+		loadListItem(WIDGET_TAG_ENGINE, null, node, engines, Engine.class);
 	}
 
 
@@ -217,7 +219,9 @@ public class Widget extends AbstractConfigObject {
 		return splashes.getValue();
 	}
 	
-
+	public List<Engine> getEngines(){
+		return engines.getValue();
+	}
 	
 	public void setId(String id) {
 		this.id.setValue(id);
@@ -289,6 +293,10 @@ public class Widget extends AbstractConfigObject {
 		addItem(splash,splashes);
 	}
 	
+	public void addEngine(Engine engine){
+		addItem(engine, engines);
+	}
+	
 	
 	public void removePreference( Preference preference){
 		removeItem(preference, this.preferences);
@@ -310,7 +318,9 @@ public class Widget extends AbstractConfigObject {
 		removeItem(splash, this.splashes);
 	}
 	
-	
+	public void removeEngine(Engine engine){
+		removeItem(engine, this.engines);
+	}
 	
 	private <T extends AbstractConfigObject > void removeItem(T object, Property<List<T>> property){
 		if(object == null )
@@ -325,9 +335,7 @@ public class Widget extends AbstractConfigObject {
 			}
 			
 		}
-		
 	}
-	
 	
 	private <T extends AbstractConfigObject> void addItem(T object, Property<List<T>> property){
 		if (object == null )

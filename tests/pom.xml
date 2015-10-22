@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.eclipse.thym</groupId>
 		<artifactId>parent</artifactId>
-		<version>0.1.0-SNAPSHOT</version>
+		<version>1.0.2-SNAPSHOT</version>
 	</parent>
 	<groupId>org.eclipse.thym</groupId>
 	<artifactId>tests</artifactId>
@@ -13,5 +13,6 @@
 	
 	<modules>
 		<module>org.eclipse.thym.test</module>
+		<module>org.eclipse.thym.ui.importer.test</module>
 	</modules>
 </project>

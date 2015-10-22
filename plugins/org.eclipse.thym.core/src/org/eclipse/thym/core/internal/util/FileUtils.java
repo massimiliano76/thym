@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2013, 2014 Red Hat, Inc. 
+ * Copyright (c) 2013, 2015 Red Hat, Inc. 
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -27,7 +27,6 @@ import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
@@ -89,7 +88,8 @@ public final class FileUtils {
 	/**
 	 * Copies the contents of source file to the destination file.
 	 * Source can be a file on the file system or a jar file.
-	 * Destination is a file on the file system.
+	 * Destination is a file on the file system. If destination
+	 * already exists this method does nothing.
 	 * 
 	 * @param source - file on the file system or jar file
 	 * @param destination - a file on the file system
@@ -106,8 +106,15 @@ public final class FileUtils {
 		source = getFileURL(source);
 		destination = getFileURL(destination);
 		File dstFile = new File(destination.getFile());
-		if( !dstFile.exists() && !dstFile.createNewFile()){
-			return;
+		if( dstFile.exists()){
+			return; //already exists
+		}else{
+			if(!dstFile.getParentFile().exists() && !dstFile.getParentFile().mkdirs()){
+				return;// not able to create parent
+			}
+			if(!dstFile.createNewFile()){
+				return;// not able to create file
+			}
 		}
 
 		if("file".equals(source.getProtocol())){

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2013, 2014 Red Hat, Inc. 
+ * Copyright (c) 2013, 2015 Red Hat, Inc. 
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,7 +11,6 @@
 package org.eclipse.thym.ui.plugins.internal;
 
 import java.util.Iterator;
-import java.util.List;
 
 import org.eclipse.jface.layout.GridDataFactory;
 import org.eclipse.jface.layout.GridLayoutFactory;
@@ -23,74 +22,49 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.Link;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.thym.core.plugin.registry.CordovaPluginRegistryMapper;
 import org.eclipse.thym.core.plugin.registry.CordovaRegistryPluginInfo;
 
-public class CordovaPluginInfoItem extends BaseCordovaPluginItem<CordovaRegistryPluginInfo>{
+public class CordovaPluginInfoItem extends ControlListItem<CordovaRegistryPluginInfo>{
 
-	private static final String LABEL_TEXT_KEYWORDS = "keywords:";
-	private static final String LABEL_TEXT_LATEST = "Latest: ";
 	private static final int MAX_DESCRIPTION_CHARS = 162;
 	private final CordovaPluginCatalogViewer viewer;
+	private final CordovaPluginWizardResources resources;
 	private Button checkbox;
 	private boolean installed;
 	private Label nameLabel;
 	private Label description;
 	private String nameString;
 	private String descriptionText;
-	private Composite keywordsContainer;
+	private Label oldIdLabel;
 
 	public CordovaPluginInfoItem(Composite parent, CordovaRegistryPluginInfo element, CordovaPluginWizardResources resources, CordovaPluginCatalogViewer viewer, boolean installed) {
-		super(parent,element,resources);
+		super(parent,SWT.NULL, element);
+		this.resources = resources;
 		this.viewer = viewer;
 		this.installed = installed;
 	}
 
 	@Override
 	protected void refresh() {
-		createContent();
+		if(nameLabel == null ){//already created¸
+			createContent();
+		}
 		checkbox.setEnabled(!installed);
+		if(installed){
+			nameLabel.setFont(resources.getSmallItalicHeaderFont());
+			description.setFont(resources.getItalicFont());
+		}
 		nameLabel.setText(getNameString());
 		description.setText(getDescriptionText()); 
-		initKeywords();
+		if(oldIdLabel != null ){
+			oldIdLabel.setText(NLS.bind("formerly: {0}", CordovaPluginRegistryMapper.toOld(getData().getName())));
+		}
 	}
 	
 
-	private void initKeywords() {
-		List<String> keywords = getData().getKeywords();
-		if (keywordsContainer == null && keywords != null) {
-			int colSize = keywords == null ? 1 : keywords.size() + 1;
-			keywordsContainer = new Composite(this,
-					SWT.INHERIT_NONE);
-			GridDataFactory.swtDefaults().align(SWT.END, SWT.BEGINNING)
-					.span(3, 1).applyTo(keywordsContainer);
-			GridLayoutFactory.fillDefaults().spacing(1, 1).numColumns(colSize)
-					.applyTo(keywordsContainer);
 
-			final Label keywordLbl = new Label(keywordsContainer, SWT.NONE);
-			keywordLbl.setFont(resources.getSubTextFont());
-			keywordLbl.setText(LABEL_TEXT_KEYWORDS);
-			
-			for (String string : keywords) {
-				final Link hyperlink = new Link(keywordsContainer, SWT.NONE);
-				hyperlink.setFont(resources.getSubTextFont());
-				GridDataFactory.fillDefaults().grab(false, false)
-						.applyTo(hyperlink);
-				hyperlink.setText(NLS.bind("<a >{0}</a>", string));
-				hyperlink.setData(string);
-				hyperlink.addListener(SWT.Selection, new Listener() {
-					
-					@Override
-					public void handleEvent(Event event) {
-						Link link = (Link)event.widget;
-						String keyword = (String) link.getData();
-						viewer.applyFilter(keyword);
-					}
-				});
-			}     
-		}
-	}
 
 	private String getDescriptionText() {
 		if(descriptionText == null ){
@@ -134,21 +108,21 @@ public class CordovaPluginInfoItem extends BaseCordovaPluginItem<CordovaRegistry
 	}
 	
 	private void createContent(){
-		if(nameLabel != null ){//already created
-			return;
-		}
+
 		GridLayout layout = new GridLayout(3, false);
 		layout.marginLeft = 7;
 		layout.marginTop = 2;
 		setLayout(layout);
 
-		final Composite checkboxContainer = new Composite(this, SWT.INHERIT_NONE);
-		GridDataFactory.swtDefaults().align(SWT.CENTER, SWT.BEGINNING).span(1, 3).applyTo(checkboxContainer);
+		final Composite checkboxContainer = new Composite(this, SWT.NULL);
+		GridDataFactory.swtDefaults().align(SWT.CENTER, SWT.BEGINNING).span(1, 4).applyTo(checkboxContainer);
 		GridLayoutFactory.fillDefaults().spacing(1, 1).numColumns(3).applyTo(checkboxContainer);
 
 		checkbox = new Button(checkboxContainer, SWT.CHECK | SWT.INHERIT_FORCE);
 		checkbox.setText(" "); //$NON-NLS-1$
-		GridDataFactory.swtDefaults().align(SWT.CENTER, SWT.CENTER).applyTo(checkbox);
+		GridDataFactory.swtDefaults()
+		.align(SWT.CENTER, SWT.CENTER)
+		.applyTo(checkbox);
 		checkbox.addListener(SWT.Selection, new Listener() {
 			
 			@Override
@@ -164,21 +138,19 @@ public class CordovaPluginInfoItem extends BaseCordovaPluginItem<CordovaRegistry
 		description = new Label(this, SWT.NULL | SWT.WRAP);
 		GridDataFactory.fillDefaults().grab(true, false).span(2, 2).hint(100, SWT.DEFAULT).applyTo(description);
 		
-		final Label versionLbl = new Label(this, SWT.NONE);
-		versionLbl.setFont(resources.getSubTextFont());
-		GridDataFactory.fillDefaults().grab(true, false).span(2, 1).applyTo(versionLbl);
-		versionLbl.setText(LABEL_TEXT_LATEST+ getData().getLatestVersion());
-		
-	}
-	
-	@Override
-	public void updateColors(int index) {
-		super.updateColors(index);
-		if(installed){
-			setForeground(resources.getDisabledColor());
-		}else{
-			setForeground(getDisplay().getSystemColor(SWT.COLOR_LIST_FOREGROUND));
+		String oldId = CordovaPluginRegistryMapper.toOld(getData().getName());
+		if( oldId != null ){
+			oldIdLabel = new Label(this, SWT.NULL);
+			GridDataFactory.fillDefaults().grab(true, false).span(2,1).align(SWT.FILL, SWT.CENTER).applyTo(oldIdLabel);
+			oldIdLabel.setFont(resources.getSubTextFont());
 		}
+		
+		Label separator = new Label(this, SWT.SEPARATOR | SWT.HORIZONTAL);
+		GridDataFactory.fillDefaults()
+		.indent(0, 2)
+		.grab(true, false)
+		.span(2, 1)
+		.align(SWT.FILL, SWT.BEGINNING)
+		.applyTo(separator);
 	}
-	
 }

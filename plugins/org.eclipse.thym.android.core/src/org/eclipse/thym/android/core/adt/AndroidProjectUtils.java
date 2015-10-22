@@ -26,6 +26,7 @@ import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.thym.android.core.AndroidCore;
+import org.eclipse.thym.core.config.ImageResourceBase;
 import org.eclipse.thym.core.engine.HybridMobileLibraryResolver;
 import org.eclipse.thym.core.platform.PlatformConstants;
 
@@ -61,22 +62,24 @@ public class AndroidProjectUtils {
 			Properties props = new Properties();
 			props.load(reader);
 			String targetValue = props.getProperty("target");
-			int splitIndex = targetValue.indexOf('-');
-			if(targetValue != null && splitIndex >-1){
-				AndroidAPILevelComparator alc = new AndroidAPILevelComparator();
-				targetValue = targetValue.substring(splitIndex+1);
-				AndroidSDKManager sdkManager = AndroidSDKManager.getManager();
-				List<AndroidSDK> targets = sdkManager.listTargets();
-				for (AndroidSDK androidSDK : targets) {
-					if(alc.compare(targetValue, androidSDK.getApiLevel())<=0){
-						return androidSDK;
+			if(targetValue != null ){
+				int splitIndex = targetValue.indexOf('-');
+				if(splitIndex >-1){
+					AndroidAPILevelComparator alc = new AndroidAPILevelComparator();
+					targetValue = targetValue.substring(splitIndex+1);
+					AndroidSDKManager sdkManager = AndroidSDKManager.getManager();
+					List<AndroidSDK> targets = sdkManager.listTargets();
+					for (AndroidSDK androidSDK : targets) {
+						if(alc.compare(targetValue, androidSDK.getApiLevel())==0){
+							return androidSDK;
+						}
 					}
+					// if we are here we failed to find a target.
+					throw new CoreException(new Status(IStatus.ERROR, AndroidCore.PLUGIN_ID, 
+							NLS.bind("Please install Android API level {0}. Use the Android SDK Manager to install or upgrade any missing SDKs to tools."
+									,targetValue)));
+					
 				}
-				// if we are here we failed to find a target.
-				throw new CoreException(new Status(IStatus.ERROR, AndroidCore.PLUGIN_ID, 
-						NLS.bind("Please install Android API level {0}. Use the Android SDK Manager to install or upgrade any missing SDKs to tools."
-								,targetValue)));
-
 			}
 		} catch (FileNotFoundException e) {
 			AndroidCore.log(IStatus.WARNING, "Missing project.properties for library", e);
@@ -86,6 +89,40 @@ public class AndroidProjectUtils {
 		// We could not determine a targetValue	
 		throw new CoreException(new Status(IStatus.ERROR, AndroidCore.PLUGIN_ID,
 				"Could not determine required Android level for the Cordova engine, please use a different one"));
+	}
+	/**
+	 * Calculates a density string for the given icon element from config.xml
+	 * 
+	 * @param icon
+	 * @return density or null if one can not be calculated or icon is null.
+	 */
+	public static String getDensityForIcon(ImageResourceBase icon){
+		if(icon == null ){
+			return null;
+		}
+		String density = icon.getDensity();
+		if(density == null || density.isEmpty()){
+			int size = Math.max(icon.getHeight(),icon.getWidth());
+			if(size > 0){
+				switch (size) {
+				case 36: density = "ldpi";
+					break;
+				case 48: density = "mdpi";
+					break;
+				case 72: density = "hdpi";
+					break;
+				case 96: density = "xhdpi";
+					break;
+				case 144: density = "xxhdpi";
+					break;
+				case 192: density = "xxxhdpi";
+					break;
+				default: density = null;
+					break;
+				}
+			}
+		}
+		return density;
 	}
 
 }

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2013, 2014 Red Hat, Inc. 
+ * Copyright (c) 2013, 2015 Red Hat, Inc. 
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,7 +11,6 @@
  *******************************************************************************/
 package org.eclipse.thym.core.config;
 
-import static org.eclipse.thym.core.config.WidgetModelConstants.NS_PHONEGAP_1_0;
 import static org.eclipse.thym.core.config.WidgetModelConstants.NS_W3C_WIDGET;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_ACCESS;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_AUTHOR;
@@ -21,6 +20,7 @@ import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_ICON;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_LICENSE;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_PREFERENCE;
 import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_SPLASH;
+import static org.eclipse.thym.core.config.WidgetModelConstants.WIDGET_TAG_ENGINE;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,6 +37,7 @@ import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.Plugin;
@@ -45,9 +46,8 @@ import org.eclipse.osgi.util.NLS;
 import org.eclipse.thym.core.HybridCore;
 import org.eclipse.thym.core.HybridProject;
 import org.eclipse.wst.sse.core.StructuredModelManager;
-import org.eclipse.wst.sse.core.internal.model.ModelLifecycleEvent;
-import org.eclipse.wst.sse.core.internal.provisional.IModelLifecycleListener;
 import org.eclipse.wst.sse.core.internal.provisional.IModelManager;
+import org.eclipse.wst.sse.core.internal.provisional.IModelStateListener;
 import org.eclipse.wst.sse.core.internal.provisional.IStructuredModel;
 import org.eclipse.wst.xml.core.internal.cleanup.CleanupProcessorXML;
 import org.eclipse.wst.xml.core.internal.provisional.document.IDOMModel;
@@ -68,7 +68,7 @@ import org.xml.sax.SAXException;
  *
  */
 @SuppressWarnings("restriction")
-public class WidgetModel implements IModelLifecycleListener{
+public class WidgetModel implements IModelStateListener{
 	
 	private static Map<HybridProject, WidgetModel> widgetModels = new HashMap<HybridProject, WidgetModel>();
 	public static final String[] ICON_EXTENSIONS = {"gif", "ico", "jpeg", "jpg", "png","svg" };
@@ -97,7 +97,13 @@ public class WidgetModel implements IModelLifecycleListener{
 		if( !widgetModels.containsKey(project) ){
 			synchronized (WidgetModel.class) {
 				WidgetModel wm = new WidgetModel(project);
-				widgetModels.put(project,wm);
+				if(wm.configFile != null ){
+					// Do not cache if config file is not present to allow it to correct itself. 
+					// This typically happens during project creation when widget model 
+					// is accessed before templates are copied. 
+					widgetModels.put(project,wm);
+				}
+				return wm;
 			}
 		}
 		return widgetModels.get(project);
@@ -142,7 +148,7 @@ public class WidgetModel implements IModelLifecycleListener{
 	 */
 	public Widget getWidgetForRead() throws CoreException{
 		long enter = System.currentTimeMillis();
-		if (!this.configFile.exists()) {
+		if (this.configFile == null || !this.configFile.exists()) {
 			return null;
 		}
 		if (readonlyWidget == null || readonlyTimestamp != configFile.lastModified()) {
@@ -188,7 +194,7 @@ public class WidgetModel implements IModelLifecycleListener{
 				try {
 					underLyingModel = manager.getModelForEdit(configXml);
 					if ((underLyingModel != null) && (underLyingModel instanceof IDOMModel)) {
-						underLyingModel.addModelLifecycleListener(this);
+						underLyingModel.addModelStateListener(this);
 						IDOMModel domModel = (IDOMModel) underLyingModel;
 						editableWidget = load(domModel.getDocument());
 					}
@@ -204,7 +210,10 @@ public class WidgetModel implements IModelLifecycleListener{
 	}
 
 	protected IFile configXMLtoIFile() {
-		IFile[] configFileCandidates = ResourcesPlugin.getWorkspace().getRoot().findFilesForLocationURI(configFile.toURI());
+		if(configFile == null ){
+			return null;
+		}
+		final IFile[] configFileCandidates = ResourcesPlugin.getWorkspace().getRoot().findFilesForLocationURI(configFile.toURI());
 		if(configFileCandidates == null || configFileCandidates.length == 0){
 			return null;
 		}
@@ -237,7 +246,13 @@ public class WidgetModel implements IModelLifecycleListener{
 
 	private static File getConfigXml(HybridProject project) {
 		IFile configXml = project.getConfigFile();
-		return configXml.getLocation().toFile();
+		if(configXml != null && configXml.exists()){
+			IPath location = configXml.getLocation();
+			if(location != null ){
+				return location.toFile();
+			}
+		}
+		return null;
 	}
 	
 	
@@ -356,7 +371,7 @@ public class WidgetModel implements IModelLifecycleListener{
 	 * @return new Splash 
 	 */
 	public Splash createSplash(Widget widget){
-		return createObject(widget, NS_PHONEGAP_1_0, WIDGET_TAG_SPLASH, Splash.class);
+		return createObject(widget, null, WIDGET_TAG_SPLASH, Splash.class);
 	}
 	
 	/**
@@ -370,6 +385,10 @@ public class WidgetModel implements IModelLifecycleListener{
 	 */
 	public License createLicense(Widget widget){
 		return createObject(widget, NS_W3C_WIDGET, WIDGET_TAG_LICENSE, License.class);
+	}
+	
+	public Engine createEngine(Widget widget){
+		return createObject(widget, null, WIDGET_TAG_ENGINE, Engine.class);
 	}
 	
 	
@@ -390,22 +409,6 @@ public class WidgetModel implements IModelLifecycleListener{
 		return null;
 	}
 
-	@Override
-	public void processPostModelEvent(ModelLifecycleEvent event) {
-		if(event.getType() == ModelLifecycleEvent.MODEL_DIRTY_STATE && !underLyingModel.isDirty()){
-			synchronized (this) {
-				reloadEditableWidget();
-				//release the readOnly model to be reloaded
-				this.readonlyWidget = null;
-				this.readonlyTimestamp = -1;
-			}
-		}
-	}
-
-	@Override
-	public void processPreModelEvent(ModelLifecycleEvent event) {
-	}
-	
 	public synchronized void dispose(){
 		if(underLyingModel != null ){
 			underLyingModel.releaseFromEdit();
@@ -413,6 +416,46 @@ public class WidgetModel implements IModelLifecycleListener{
 		}
 		this.editableWidget = null;
 		this.readonlyWidget = null;
+	}
+
+	@Override
+	public void modelAboutToBeChanged(IStructuredModel model) {
+		
+	}
+
+	@Override
+	public void modelChanged(IStructuredModel model) {
+	}
+
+	@Override
+	public void modelDirtyStateChanged(IStructuredModel model, boolean isDirty) {
+		if(!isDirty){
+			synchronized (this) {
+				reloadEditableWidget();
+				//release the readOnly model to be reloaded
+				this.readonlyWidget = null;
+				this.readonlyTimestamp = -1;
+			}	
+		}
+	}
+
+	@Override
+	public void modelResourceDeleted(IStructuredModel model) {
+		dispose();
+	}
+
+	@Override
+	public void modelResourceMoved(IStructuredModel oldModel, IStructuredModel newModel) {
+		
+	}
+
+	@Override
+	public void modelAboutToBeReinitialized(IStructuredModel structuredModel) {
+		
+	}
+
+	@Override
+	public void modelReinitialized(IStructuredModel structuredModel) {
 	}
 	
 }

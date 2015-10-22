@@ -137,7 +137,7 @@ public class WidgetModelTest {
 	private Document getConfigXMLDocument()
 			throws ParserConfigurationException, UnsupportedEncodingException,
 			SAXException, IOException, CoreException {
-		IFile file = project.getProject().getFile("/www/config.xml");
+		IFile file = project.getProject().getFile("/config.xml");
 		Document doc = loadXMLDocument(file.getContents());
 		return doc;
 	}
@@ -259,6 +259,39 @@ public class WidgetModelTest {
 	}
 	
 	@Test
+	public void testEngine() throws CoreException,ParserConfigurationException, SAXException, IOException{
+		WidgetModel model = WidgetModel.getModel(project.hybridProject());
+		Widget widget = model.getWidgetForEdit();
+		Engine engine = model.createEngine(widget);
+		String name = "my_anroid";
+		String version = "1.2.3.4";
+		engine.setVersion(version);
+		engine.setName(name);
+		assertEquals(name, engine.getName());
+		assertEquals(version, engine.getVersion());
+		widget.addEngine(engine);
+		model.save();
+		
+		Document doc = getConfigXMLDocument();
+		boolean nameMatched = false;
+		boolean versionMatched = false;
+		NodeList list = doc.getDocumentElement().getElementsByTagName("engine");
+		for (int i = 0; i < list.getLength(); i++) {
+			Node curr = list.item(i);
+			String nameAtt = getAtrributeValue(curr, WidgetModelConstants.ENGINE_ATTR_NAME);
+			if(name.equals(nameAtt)){
+				nameMatched =true;
+			}
+			String versionAtt = getAtrributeValue(curr, WidgetModelConstants.ENGINE_ATTR_VERSION);
+			if(version.equals(versionAtt)){
+				versionMatched = true;
+			}
+		}
+		assertTrue("name for engine is not persisted correctly", nameMatched);
+		assertTrue("version for engine is not persisted correctly", versionMatched);
+	}
+	
+	@Test
 	public void testLicense() throws UnsupportedEncodingException, ParserConfigurationException, SAXException, IOException, CoreException{
 		WidgetModel model = WidgetModel.getModel(project.hybridProject());
 		Widget widget = model.getWidgetForEdit();
@@ -288,7 +321,7 @@ public class WidgetModelTest {
 		Document doc = getConfigXMLDocument();
 		doc.getDocumentElement().setAttribute(WidgetModelConstants.WIDGET_ATTR_ID, "rev.id");
 		doc.getDocumentElement().setAttribute(WidgetModelConstants.WIDGET_ATTR_VERSION, "rev.ver");
-		IFile file = project.getProject().getFile("/www/config.xml");
+		IFile file = project.getProject().getFile("/config.xml");
 		TransformerFactory transformerFactory = TransformerFactory
 				.newInstance();
 		Transformer xformer = transformerFactory.newTransformer();

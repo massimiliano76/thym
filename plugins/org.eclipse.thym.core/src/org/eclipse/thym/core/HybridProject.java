@@ -18,7 +18,6 @@ import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IAdaptable;
 import org.eclipse.core.runtime.IPath;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.thym.core.config.Widget;
 import org.eclipse.thym.core.config.WidgetModel;
 import org.eclipse.thym.core.engine.HybridMobileEngine;
@@ -34,8 +33,6 @@ import org.eclipse.thym.core.plugin.CordovaPluginManager;
  */
 public class HybridProject implements IAdaptable {
 	
-	private static final IPath[] CONFIG_PATHS = {new Path(PlatformConstants.DIR_WWW).append(PlatformConstants.FILE_XML_CONFIG),
-													new Path(PlatformConstants.FILE_XML_CONFIG) };
 	private IProject kernelProject;
 	private CordovaPluginManager pluginManager;
 	private HybridMobileEngineManager engineManager;
@@ -141,7 +138,7 @@ public class HybridProject implements IAdaptable {
 	 * @return
 	 */
 	public IFile getConfigFile(){
-		for (IPath configPath : CONFIG_PATHS) {
+		for (IPath configPath : PlatformConstants.CONFIG_PATHS) {
 			IFile f = kernelProject.getFile(configPath);
 			if(f.exists()){
 				return f;
@@ -158,12 +155,28 @@ public class HybridProject implements IAdaptable {
 	}
 	
 	/**
-	 * Returns the currently used {@link HybridMobileEngine} for this project.
-	 * If an engine can not be determined a default engine is returned.
-	 * @return
+	 * Returns the currently used {@link HybridMobileEngine}s for this project.
+	 * 
+	 * @return array of engines
 	 */
-	public HybridMobileEngine getActiveEngine(){
-		return getHybridMobileEngineManager().getActiveEngine();
+	public HybridMobileEngine[] getActiveEngines(){
+		return getHybridMobileEngineManager().getActiveEngines();
+	}
+	
+	/**
+	 * Returns the active engine for the platform id or null if there is not one.
+	 * 
+	 * @param platformId
+	 * @return active engine or null
+	 */
+	public HybridMobileEngine getActiveEngineForPlatform(String platformId){
+		HybridMobileEngine[] engines = getActiveEngines();
+		for (HybridMobileEngine hybridMobileEngine : engines) {
+			if(platformId.equals(hybridMobileEngine.getId())){
+				return hybridMobileEngine;
+			}
+		}
+		return null;
 	}
 	
 	/**
@@ -171,9 +184,9 @@ public class HybridProject implements IAdaptable {
 	 * @param engine
 	 * @throws CoreException
 	 */
-	public void updateActiveEngine(HybridMobileEngine engine) throws CoreException{
-		Assert.isLegal(engine != null, "Engine can not be null" );
-		getHybridMobileEngineManager().updateEngine(engine);
+	public void updateActiveEngines(final HybridMobileEngine[] engines) throws CoreException{
+		Assert.isLegal(engines != null, "Engines can not be null" );
+		getHybridMobileEngineManager().updateEngines(engines);
 	}
 	
 

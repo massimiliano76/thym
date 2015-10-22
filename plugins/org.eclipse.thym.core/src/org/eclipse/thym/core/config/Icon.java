@@ -17,11 +17,12 @@ import org.w3c.dom.Node;
  * @author Gorkem Ercan
  */
 public class Icon extends ImageResourceBase {
+	
 
 	Icon(Node node) {
 		super(node);
 	}
-
+	
 	@Override
 	public boolean equals(Object obj) {
 		if(obj == null || !(obj instanceof Icon))

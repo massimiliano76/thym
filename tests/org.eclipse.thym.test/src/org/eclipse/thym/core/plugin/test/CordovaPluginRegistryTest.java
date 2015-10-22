@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2013, 2014 Red Hat, Inc. 
+ * Copyright (c) 2013, 2015 Red Hat, Inc. 
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -15,9 +15,10 @@ import java.util.List;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.thym.core.plugin.registry.CordovaRegistryPlugin;
+import org.eclipse.thym.core.plugin.registry.CordovaRegistryPlugin.RegistryPluginVersion;
 import org.eclipse.thym.core.plugin.registry.CordovaRegistryPluginInfo;
 import org.eclipse.thym.core.plugin.registry.CordovaPluginRegistryManager;
-import org.eclipse.thym.core.plugin.registry.CordovaRegistryPluginVersion;
+import org.eclipse.thym.core.plugin.registry.CordovaPluginRegistryMapper;
 
 import static org.junit.Assert.*;
 
@@ -25,6 +26,9 @@ import org.junit.Test;
 
 public class CordovaPluginRegistryTest {
 	
+	private static final String MAPPER_OLD_ID = "org.apache.cordova.console";
+	private static final String MAPPER_NEW_ID = "cordova-plugin-console";
+
 	@Test
 	public void testRetrievePluginInfosFromCordovaRegistry() throws CoreException{
 		CordovaPluginRegistryManager client = getCordovaIORegistryClient();
@@ -44,18 +48,46 @@ public class CordovaPluginRegistryTest {
 		assertNotNull(plugin);
 		assertNotNull(plugin.getName());
 		assertEquals(info.getName(), plugin.getName());
-		assertNotNull(plugin.getVersions());
-		List<CordovaRegistryPluginVersion> versions = plugin.getVersions();
+		List<RegistryPluginVersion> versions = plugin.getVersions();
+		assertNotNull(versions);
 		assertFalse(versions.isEmpty());
-		CordovaRegistryPluginVersion version = versions.get(0);
+		RegistryPluginVersion version = versions.get(0);
 		assertNotNull(version.getName());
 		assertNotNull(version.getVersionNumber());
-		assertNotNull(version.getDistributionSHASum());
-		assertNotNull(version.getDistributionTarball());
+		assertNotNull(version.getShasum());
+		assertNotNull(version.getTarball());
+	}
+	
+	@Test
+	public void testCordovaRegistryMapper_toOld(){
+		String oldID = CordovaPluginRegistryMapper.toOld(MAPPER_NEW_ID); 
+		assertEquals(MAPPER_OLD_ID, oldID);
+		assertNull("unkown new id should return null",CordovaPluginRegistryMapper.toOld("some-unknown-id"));
 	}
 
+	@Test
+	public void testCordovaRegistryMapper_toNew(){
+		String newId = CordovaPluginRegistryMapper.toNew(MAPPER_OLD_ID);
+		assertEquals(MAPPER_NEW_ID, newId);
+		assertNull("unknow old  id should return null", CordovaPluginRegistryMapper.toNew("some.old.id"));
+	}
+	
+	@Test
+	public void testCordovaRegistryMapper_alternateId(){
+		String alternate = CordovaPluginRegistryMapper.alternateID(MAPPER_OLD_ID);
+		assertEquals(MAPPER_NEW_ID, alternate);
+		alternate = CordovaPluginRegistryMapper.alternateID(MAPPER_NEW_ID);
+		assertEquals(MAPPER_OLD_ID,alternate);
+	}
+	
+	@Test
+	public void testCordovaRegistryMapper_nullParams(){
+		assertNull(CordovaPluginRegistryMapper.toNew(null));
+		assertNull(CordovaPluginRegistryMapper.toOld(null));
+	}
+	
 	private CordovaPluginRegistryManager getCordovaIORegistryClient() {
-		CordovaPluginRegistryManager client = new CordovaPluginRegistryManager("http://registry.cordova.io/");
+		CordovaPluginRegistryManager client = new CordovaPluginRegistryManager();
 		return client;
 	}
 }

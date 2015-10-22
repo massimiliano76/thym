@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.eclipse.thym</groupId>
 		<artifactId>parent</artifactId>
-		<version>0.1.0-SNAPSHOT</version>
+		<version>1.0.2-SNAPSHOT</version>
 	</parent>
 	<groupId>org.eclipse.thym</groupId>
 	<artifactId>target-platforms</artifactId>
@@ -13,6 +13,7 @@
 
 	<modules>
 		<module>luna.R</module>
-		<module>mars.M</module>
+		<module>mars.R</module>
+		<module>neon.M</module>
 	</modules>
 </project>
